@@ -10,6 +10,7 @@ public class Client {
     private DataInputStream dataInputStream;         //stream read from the socket
 
     private FileTransferUtility fileTransferUtility;
+    private boolean isAuthenticated;
 
     public static void main(String args[]){
 
@@ -47,15 +48,34 @@ public class Client {
 
             //get Input from standard input
             BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in));
-            while(true)
+            while(requestSocket.isConnected())
             {
-                System.out.print("Please input a command to run: ");
+                String serverCommand = dataInputStream.readUTF();
+                System.out.print(serverCommand);
+                String input = bufferedReader.readLine();
 
-                //read a command from the standard input
-                String request = bufferedReader.readLine();
+                if (!isAuthenticated){
 
-                //Send the command to the server
-                handleRequest(request);
+                    sendString(input);
+
+                    int status = dataInputStream.readInt();
+
+                    if (status == Authentication.STATUS_CODE_AUTHENTICATED){
+                        isAuthenticated = true;
+                        System.out.println("Authentication Successful!");
+                    }
+                    else if(status == Authentication.STATUS_CODE_AUTHENTICATION_FAILED){
+                        System.out.println("Authentication Failed!");
+                    }
+                }
+                else
+                {
+                    //Send the command to the server
+                    sendString(input);
+
+                    prepareForResponse();
+                }
+
             }
         }
         catch (ConnectException ex) {
@@ -88,7 +108,7 @@ public class Client {
         }
     }
 
-    private void sendRequest(String command) {
+    private void sendString(String command) {
         try{
             //stream write the message
             dataOutputStream.writeUTF(command);
@@ -99,19 +119,32 @@ public class Client {
         }
     }
 
-    private void handleRequest(String request) throws IOException {
+    private void sendInt(int statusCode) {
+        try{
+            dataOutputStream.writeInt(statusCode);
+            dataOutputStream.flush();
+        }
+        catch(IOException ioException){
+            ioException.printStackTrace();
+        }
+    }
 
-        InputCommand command = new InputCommand(request);
+    private void prepareForResponse() throws IOException {
 
-        switch (command.type) {
+        int statusCode = dataInputStream.readInt();
+        InputCommand.Type status = InputCommand.Type.values()[statusCode];
+
+        switch (status) {
             case DIR:
-                getDirectoryContent(request);
+                getDirectoryContent();
                 break;
             case GET:
-                initiateFileDownload(command.fileName, request);
+                String downloadFileName = dataInputStream.readUTF();
+                initiateFileDownload(downloadFileName);
                 break;
             case UPLOAD:
-                initiateFileUpload(command.fileName, request);
+                String uploadFileName = dataInputStream.readUTF();
+                initiateFileUpload(uploadFileName);
                 break;
             default:
                 System.out.println(MessageStrings.invalidCommand);
@@ -119,39 +152,39 @@ public class Client {
         }
     }
 
-    private void getDirectoryContent(String request) throws IOException{
-        sendRequest(request);
+    private void getDirectoryContent() throws IOException{
         String response = dataInputStream.readUTF();
         System.out.println(response);
     }
 
-    private void initiateFileDownload(String fileName,String request) throws IOException{
+    private void initiateFileDownload(String fileName) throws IOException{
 
-        sendRequest(request);
+        int statusCode = dataInputStream.readInt();
 
-        String status = dataInputStream.readUTF();
+        if (statusCode == FileTransferUtility.STATUS_CODE_FILE_FOUND){
 
-        if (status.equals(FileTransferUtility.status200)){
             fileTransferUtility.receiveFileData(fileName, clientDirectory);
         }
-        else if(status.equals(FileTransferUtility.status404))
+        else if(statusCode == FileTransferUtility.STATUS_CODE_FILE_NOT_FOUND)
         {
             System.out.println(MessageStrings.fileNotFound);
         }
     }
 
-    private void initiateFileUpload(String fileName, String request) throws IOException{
+    private void initiateFileUpload(String fileName) throws IOException{
 
         File file = new File(fileName);
 
         if(file.exists() && !file.isDirectory()) {
 
-            sendRequest(request);
+            sendInt(FileTransferUtility.STATUS_CODE_FILE_FOUND);
 
             fileTransferUtility.sendFileData(file);
         }
         else
         {
+            sendInt(FileTransferUtility.STATUS_CODE_FILE_NOT_FOUND);
+
             System.out.println(MessageStrings.fileNotFound);
         }
     }

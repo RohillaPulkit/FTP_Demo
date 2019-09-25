@@ -18,6 +18,7 @@ public class ServerThread extends Thread {
     private DataInputStream dataInputStream;    //stream read from the socket
 
     private FileTransferUtility fileTransferUtility;
+    private boolean isAuthenticated;
 
     public ServerThread(Socket clientSocket) {
         this.socket = clientSocket;
@@ -34,19 +35,42 @@ public class ServerThread extends Thread {
 
             fileTransferUtility = new FileTransferUtility(dataOutputStream, dataInputStream);
 
-            while(true)
+            while(socket.isConnected())
             {
-                //receive the request sent from the client
-                String request = dataInputStream.readUTF();
+                if (!isAuthenticated){
 
-                //trim whitespaces
-                request = request.trim();
+                    sendString("Please log in using UserName and Password: ");
 
-                System.out.println("Received request: " + request);
+                    String credentials = dataInputStream.readUTF();
 
-                handleRequest(request);
+                    System.out.println("Received credentials: " + credentials);
+
+                    isAuthenticated = Authentication.isAuthenticated(credentials);
+
+                    if (isAuthenticated){
+
+                        sendInt(Authentication.STATUS_CODE_AUTHENTICATED);
+                    }
+                    else
+                    {
+                        sendInt(Authentication.STATUS_CODE_AUTHENTICATION_FAILED);
+                    }
+                }
+                else
+                {
+                    sendString("Please input a command to run: ");
+
+                    //receive the request sent from the client
+                    String request = dataInputStream.readUTF();
+
+                    //trim whitespaces
+                    request = request.trim();
+
+                    System.out.println("Received request: " + request);
+
+                    handleRequest(request);
+                }
             }
-
         }
         catch (IOException ex){
 
@@ -56,9 +80,19 @@ public class ServerThread extends Thread {
     }
 
     //send a response to the output stream
-    private void sendResponse(String response) {
+    private void sendString(String response) {
         try{
             dataOutputStream.writeUTF(response);
+            dataOutputStream.flush();
+        }
+        catch(IOException ioException){
+            ioException.printStackTrace();
+        }
+    }
+
+    private void sendInt(int statusCode) {
+        try{
+            dataOutputStream.writeInt(statusCode);
             dataOutputStream.flush();
         }
         catch(IOException ioException){
@@ -72,15 +106,21 @@ public class ServerThread extends Thread {
 
         switch (command.type) {
             case DIR:
+                sendInt(InputCommand.Type.DIR.ordinal());
                 getDirectoryContent();
                 break;
             case GET:
+                sendInt(InputCommand.Type.GET.ordinal());
+                sendString(command.fileName);
                 initiateFileUpload(command.fileName);
                 break;
             case UPLOAD:
+                sendInt(InputCommand.Type.UPLOAD.ordinal());
+                sendString(command.fileName);
                 initiateFileDownload(command.fileName);
                 break;
             default:
+                sendInt(InputCommand.Type.INVALID.ordinal());
                 break;
         }
     }
@@ -105,17 +145,26 @@ public class ServerThread extends Thread {
                     .map(list -> String.join(" ", list))
                     .collect(Collectors.joining("\n"));
 
-            sendResponse(contents);
+            sendString(contents);
         }
         catch (IOException ex){
 
-            sendResponse("Unable to get directory content. Please try again later.");
+            sendString("Unable to get directory content. Please try again later.");
         }
 
     }
 
     private void initiateFileDownload(String fileName) throws IOException{
-        fileTransferUtility.receiveFileData(fileName, serverDirectory);
+        int statusCode = dataInputStream.readInt();
+
+        if (statusCode == FileTransferUtility.STATUS_CODE_FILE_FOUND){
+
+            fileTransferUtility.receiveFileData(fileName, serverDirectory);
+        }
+        else if(statusCode == FileTransferUtility.STATUS_CODE_FILE_NOT_FOUND)
+        {
+            System.out.println(MessageStrings.fileNotFound);
+        }
     }
 
     private void initiateFileUpload(String fileName) throws IOException{
@@ -126,13 +175,13 @@ public class ServerThread extends Thread {
 
         if(file.exists() && !file.isDirectory()) {
 
-            sendResponse(FileTransferUtility.status200);
+            sendInt(FileTransferUtility.STATUS_CODE_FILE_FOUND);
 
             fileTransferUtility.sendFileData(file);
         }
         else
         {
-            sendResponse(FileTransferUtility.status404);
+            sendInt(FileTransferUtility.STATUS_CODE_FILE_NOT_FOUND);
         }
     }
 }

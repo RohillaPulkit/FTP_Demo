@@ -4,8 +4,8 @@ import java.nio.file.Paths;
 
 public class FileTransferUtility {
 
-    public static String status404 = "Status 404";
-    public static String status200 = "Status 200";
+    public static int STATUS_CODE_FILE_FOUND = 200;
+    public static int STATUS_CODE_FILE_NOT_FOUND = 404;
 
     private DataOutputStream dataOutputStream;
     private DataInputStream dataInputStream;
