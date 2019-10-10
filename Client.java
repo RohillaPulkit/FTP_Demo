@@ -34,8 +34,10 @@ public class Client {
 
     private void initWithAddress(InputAddress inputAddress){
         try{
+
             //create a socket to connect to the server
-            requestSocket = new Socket(inputAddress.ipAddress, inputAddress.portNumber);
+            requestSocket = new Socket();
+            requestSocket.connect(new InetSocketAddress(inputAddress.ipAddress, inputAddress.portNumber), 1000);
 
             System.out.println("Connected to "+inputAddress.ipAddress.getHostAddress()+" in port "+inputAddress.portNumber);
 
@@ -85,7 +87,7 @@ public class Client {
             System.err.println(MessageStrings.unknownHost);
         }
         catch(IOException ioException){
-            ioException.printStackTrace();
+            System.out.println(MessageStrings.unreachableHost);
         }
         finally{
             closeConnection();
@@ -132,9 +134,9 @@ public class Client {
     private void prepareForResponse() throws IOException {
 
         int statusCode = dataInputStream.readInt();
-        InputCommand.Type status = InputCommand.Type.values()[statusCode];
+        InputCommand.Type commandType = InputCommand.Type.values()[statusCode];
 
-        switch (status) {
+        switch (commandType) {
             case DIR:
                 getDirectoryContent();
                 break;

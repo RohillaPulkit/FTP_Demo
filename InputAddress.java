@@ -20,7 +20,7 @@ public class InputAddress {
                 portNumber = Integer.parseInt(port);
                 isValid = true;
 
-                if (portNumber > 65535){
+                if (portNumber < 1 || portNumber > 65535){
 
                     isValid = false;
                 }

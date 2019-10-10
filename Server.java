@@ -51,19 +51,27 @@ public class Server {
             }
 
         }
-        catch(IOException ioException){
-            ioException.printStackTrace();
+        catch(Exception ex){
+            System.out.println(MessageStrings.addressNotValid);
         }
         finally{
             //Close connections
-            try{
-                serverSocket.close();
-                clientSocket.close();
-            }
-            catch(IOException ioException){
-                ioException.printStackTrace();
-            }
+           closeConnection();
         }
     }
+
+    private void closeConnection(){
+        try{
+            if (serverSocket != null)
+                serverSocket.close();
+
+            if (clientSocket != null)
+                clientSocket.close();
+        }
+        catch(IOException ioException){
+            ioException.printStackTrace();
+        }
+    }
+
 }
 

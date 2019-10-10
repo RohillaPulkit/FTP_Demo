@@ -6,5 +6,8 @@ public class MessageStrings {
     public static String fileNotFound = "Error 404: File Not Found.";
     public static String serverNotInitiated = "Connection refused. You need to initiate a server first.";
     public static String unknownHost = "You are trying to connect to an unknown host!";
+    public static String unreachableHost = "You are trying to connect to an unreachable host!";
+    public static String addressNotValid = "Unable to use entered address. Please use different address.";
+
 
 }
